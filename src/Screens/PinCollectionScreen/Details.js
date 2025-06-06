@@ -5,51 +5,98 @@ import {
   Text,
   Image,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ImageBackground,
   Platform,
   StatusBar,
-  Dimensions,
   Modal,
-  Alert,
   ScrollView,
-  useWindowDimensions,
+  ActivityIndicator,
 } from "react-native";
 import * as Burnt from "burnt";
-
 import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import axiosClient from "../../../apiClient";
+
+// Import images statically
+const scannerIcon = require("../../assets/images/scanner.png");
+const myCollectionIcon = require("../../assets/images/mycollection.png");
+const loveIcon = require("../../assets/images/love.png");
+const tradingBoardIcon = require("../../assets/images/Trading_Board.png");
+const trashIcon = require("../../assets/images/trash.png");
+const backgroundImage = require("../../assets/images/realsky.png");
 
 export default function BoardDetails() {
   const navigation = useNavigation();
   const route = useRoute();
   const { itemId } = route.params;
-  const [pin, setPin] = useState();
+  const [pin, setPin] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const insets = useSafeAreaInsets();
 
   // Get dynamic window dimensions
-  const { width, height } = useWindowDimensions();
+  const [dimensions, setDimensions] = useState({
+    width: global.Dimensions ? global.Dimensions.get("window").width : 375,
+    height: global.Dimensions ? global.Dimensions.get("window").height : 812,
+  });
 
   // Calculate responsive sizes
-  const imageSize = Math.min(width * 0.5, 200); // 50% of width but max 200px
-  const fontSize = {
-    title: Math.min(28, width * 0.07), // Responsive title size
-    detail: Math.min(14, width * 0.035), // Responsive detail text
-    button: Math.min(12, width * 0.03), // Responsive button text
+  const { width, height } = dimensions;
+  const isTablet = width > 768;
+  const imageSize = Math.min(width * (isTablet ? 0.4 : 0.5), isTablet ? 300 : 200);
+  const HORIZONTAL_PADDING = width * 0.05; // 5% of screen width
+  
+  // Responsive font sizing
+  const scaleFontSize = (size) => {
+    const scale = width / 375; // Base scale on iPhone X width
+    return Math.round(size * Math.min(scale, 1.3)); // Cap scaling at 1.3x
   };
-  const padding = {
-    horizontal: width * 0.05, // 5% of screen width
-    vertical: height * 0.02, // 2% of screen height
+
+  useEffect(() => {
+    getPin();
+    
+    // Add dimension change listener for orientation changes
+    if (global.Dimensions) {
+      const dimensionsHandler = ({ window }) => {
+        setDimensions({
+          width: window.width,
+          height: window.height,
+        });
+      };
+
+      const subscription = global.Dimensions.addEventListener("change", dimensionsHandler);
+
+      return () => {
+        subscription.remove();
+      };
+    }
+  }, []);
+
+  const getPin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axiosClient.get(`/api/pins/pin-details/${itemId}/`);
+      setPin(response.data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setError("Failed to load pin details. Please try again.");
+      Burnt.toast({
+        title: "Error",
+        preset: "error",
+        message: "Failed to load pin details",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRemovePin = async () => {
     setModalVisible(false);
     try {
-      const response = await axiosClient.delete(
-        `/api/pins/pin-details/${itemId}/`
-      );
-      setPin(response.data);
+      await axiosClient.delete(`/api/pins/pin-details/${itemId}/`);
       Burnt.toast({
         title: "Success",
         preset: "done",
@@ -57,248 +104,441 @@ export default function BoardDetails() {
       });
       navigation.navigate("MyBoards");
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error removing pin:", error);
+      Burnt.toast({
+        title: "Error",
+        preset: "error",
+        message: "Failed to remove pin",
+      });
     }
   };
 
-  useEffect(() => {
-    getPin();
-  }, []);
+  // Render loading state
+  if (loading) {
+    return (
+      <SafeAreaProvider>
+        <View style={styles.container}>
+          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+          <ImageBackground source={backgroundImage} style={styles.background}>
+            <LinearGradient
+              colors={["#000000", "rgba(0, 28, 92, 0)"]}
+              style={styles.topGradient}
+            />
+            <SafeAreaView 
+              edges={['top']} 
+              style={[
+                styles.safeArea,
+                { paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0 }
+              ]}
+            >
+              <View style={styles.header}>
+                <Text style={[styles.title, { fontSize: scaleFontSize(28) }]}>
+                  Pin Details
+                </Text>
+              </View>
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#fff" />
+                <Text style={[styles.loadingText, { fontSize: scaleFontSize(16) }]}>
+                  Loading pin details...
+                </Text>
+              </View>
+            </SafeAreaView>
+          </ImageBackground>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
-  const getPin = async () => {
-    try {
-      const response = await axiosClient.get(
-        `/api/pins/pin-details/${itemId}/`
-      );
-      setPin(response.data);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    }
-  };
+  // Render error state
+  if (error) {
+    return (
+      <SafeAreaProvider>
+        <View style={styles.container}>
+          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+          <ImageBackground source={backgroundImage} style={styles.background}>
+            <LinearGradient
+              colors={["#000000", "rgba(0, 28, 92, 0)"]}
+              style={styles.topGradient}
+            />
+            <SafeAreaView 
+              edges={['top']} 
+              style={[
+                styles.safeArea,
+                { paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0 }
+              ]}
+            >
+              <View style={styles.header}>
+                <Text style={[styles.title, { fontSize: scaleFontSize(28) }]}>
+                  Pin Details
+                </Text>
+              </View>
+              <View style={styles.errorContainer}>
+                <Text style={[styles.errorText, { fontSize: scaleFontSize(16) }]}>
+                  {error}
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.retryButton, { marginTop: height * 0.02 }]}
+                  onPress={getPin}
+                >
+                  <Text style={[styles.retryButtonText, { fontSize: scaleFontSize(14) }]}>
+                    Retry
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </SafeAreaView>
+          </ImageBackground>
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
   return (
-    <View style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        translucent
-        backgroundColor="transparent"
-      />
-      <ImageBackground
-        source={require("../../assets/images/realsky.png")}
-        style={styles.background}
-      >
-        {/* Top gradient overlay */}
-        <LinearGradient
-          colors={["#000000", "rgba(0, 28, 92, 0)"]}
-          style={styles.topGradient}
+    <SafeAreaProvider>
+      <View style={styles.container}>
+        <StatusBar
+          barStyle="light-content"
+          translucent
+          backgroundColor="transparent"
         />
+        <ImageBackground
+          source={backgroundImage}
+          style={styles.background}
+          resizeMode="cover"
+        >
+          {/* Top gradient overlay */}
+          <LinearGradient
+            colors={["#000000", "rgba(0, 28, 92, 0)"]}
+            style={styles.topGradient}
+          />
 
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { fontSize: fontSize.title }]}>
-              Pin Details
-            </Text>
-            {/* Trash Button */}
-            <TouchableOpacity
-              style={styles.trashButton}
-              onPress={() => setModalVisible(true)}
-            >
-              <Image
-                source={require("../../assets/images/trash.png")}
-                style={styles.trashIcon}
-              />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={[
-              styles.scrollContent,
-              { paddingHorizontal: padding.horizontal },
+          <SafeAreaView 
+            edges={['top']} 
+            style={[
+              styles.safeArea,
+              { paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0 }
             ]}
-            showsVerticalScrollIndicator={false}
           >
-            <View style={styles.card}>
-              <View style={styles.imageWrapper}>
-                <View
+            <View style={styles.header}>
+              <Text style={[styles.title, { fontSize: scaleFontSize(28) }]}>
+                Pin Details
+              </Text>
+              {/* Trash Button */}
+              <TouchableOpacity
+                style={[
+                  styles.trashButton,
+                  { right: HORIZONTAL_PADDING }
+                ]}
+                onPress={() => setModalVisible(true)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Image
+                  source={trashIcon}
                   style={[
-                    styles.imageContainer,
-                    { width: imageSize, height: imageSize },
+                    styles.trashIcon,
+                    { width: scaleFontSize(24), height: scaleFontSize(24) }
+                  ]}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={[
+                styles.scrollContent,
+                { 
+                  paddingHorizontal: HORIZONTAL_PADDING,
+                  paddingBottom: height * 0.12 // Space for footer
+                }
+              ]}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={[
+                styles.card,
+                { 
+                  padding: width * 0.05,
+                  borderRadius: width * 0.05
+                }
+              ]}>
+                <View style={styles.imageWrapper}>
+                  <View
+                    style={[
+                      styles.imageContainer,
+                      { 
+                        width: imageSize, 
+                        height: imageSize,
+                        borderRadius: width * 0.05
+                      }
+                    ]}
+                  >
+                    {pin && pin.image_url && (
+                      <Image
+                        source={{ uri: pin.image_url }}
+                        style={[
+                          styles.pinImage,
+                          { borderRadius: width * 0.04 }
+                        ]}
+                        resizeMode="cover"
+                      />
+                    )}
+                  </View>
+                </View>
+
+                {pin && (
+                  <View style={[
+                    styles.detailsContainer,
+                    { gap: height * 0.012 }
+                  ]}>
+                    <DetailRow 
+                      label="Name" 
+                      value={pin.name} 
+                      fontSize={scaleFontSize(14)}
+                    />
+                    <DetailRow 
+                      label="Series" 
+                      value={pin.series} 
+                      fontSize={scaleFontSize(14)}
+                    />
+                    <DetailRow 
+                      label="Origin" 
+                      value={pin.origin} 
+                      fontSize={scaleFontSize(14)}
+                    />
+                    <DetailRow 
+                      label="Edition" 
+                      value={pin.edition} 
+                      fontSize={scaleFontSize(14)}
+                    />
+                    <DetailRow 
+                      label="Release Date" 
+                      value={pin.release_date} 
+                      fontSize={scaleFontSize(14)}
+                    />
+                    <DetailRow 
+                      label="Original Price" 
+                      value={pin.original_price} 
+                      fontSize={scaleFontSize(14)}
+                    />
+                  </View>
+                )}
+              </View>
+
+              <View style={[
+                styles.moveSection,
+                { marginTop: height * 0.03 }
+              ]}>
+                <Text
+                  style={[
+                    styles.moveTitle, 
+                    { 
+                      fontSize: scaleFontSize(20),
+                      marginBottom: height * 0.02
+                    }
                   ]}
                 >
-                  {pin && pin.image_url && (
-                    <Image
-                      source={{ uri: pin.image_url }}
-                      style={styles.pinImage}
-                      resizeMode="cover"
-                    />
-                  )}
+                  Move Pin to
+                </Text>
+                <View style={[
+                  styles.moveButtons,
+                  { gap: width * 0.03 }
+                ]}>
+                  <MoveButton 
+                    icon={myCollectionIcon}
+                    label="My Pin Board"
+                    fontSize={scaleFontSize(12)}
+                    onPress={() => {
+                      Burnt.toast({
+                        title: "Pin Moved",
+                        preset: "done",
+                        message: "Pin moved to My Pin Board",
+                      });
+                    }}
+                  />
+
+                  <MoveButton 
+                    icon={loveIcon}
+                    label="My Wish Board"
+                    fontSize={scaleFontSize(12)}
+                    onPress={() => {
+                      Burnt.toast({
+                        title: "Pin Moved",
+                        preset: "done",
+                        message: "Pin moved to My Wish Board",
+                      });
+                    }}
+                  />
+
+                  <MoveButton 
+                    icon={tradingBoardIcon}
+                    label="My Trading Board"
+                    fontSize={scaleFontSize(12)}
+                    onPress={() => {
+                      Burnt.toast({
+                        title: "Pin Moved",
+                        preset: "done",
+                        message: "Pin moved to My Trading Board",
+                      });
+                    }}
+                  />
                 </View>
               </View>
+            </ScrollView>
+          </SafeAreaView>
 
-              {pin && (
-                <View style={styles.detailsContainer}>
-                  <Text
-                    style={[styles.detailText, { fontSize: fontSize.detail }]}
-                  >
-                    <Text style={styles.detailLabel}>Name: </Text>
-                    {pin.name || "Unknown"}
-                  </Text>
-                  <Text
-                    style={[styles.detailText, { fontSize: fontSize.detail }]}
-                  >
-                    <Text style={styles.detailLabel}>Series: </Text>
-                    {pin.series || "Unknown"}
-                  </Text>
-                  <Text
-                    style={[styles.detailText, { fontSize: fontSize.detail }]}
-                  >
-                    <Text style={styles.detailLabel}>Origin: </Text>
-                    {pin.origin || "Unknown"}
-                  </Text>
-                  <Text
-                    style={[styles.detailText, { fontSize: fontSize.detail }]}
-                  >
-                    <Text style={styles.detailLabel}>Edition: </Text>
-                    {pin.edition || "Unknown"}
-                  </Text>
-                  <Text
-                    style={[styles.detailText, { fontSize: fontSize.detail }]}
-                  >
-                    <Text style={styles.detailLabel}>Release Date: </Text>
-                    {pin.release_date || "Unknown"}
-                  </Text>
-                  <Text
-                    style={[styles.detailText, { fontSize: fontSize.detail }]}
-                  >
-                    <Text style={styles.detailLabel}>Original Price: </Text>
-                    {pin.original_price || "Unknown"}
-                  </Text>
-                </View>
-              )}
-            </View>
+          {/* Bottom gradient overlay */}
+          <LinearGradient
+            colors={["rgba(0, 28, 92, 0)", "#000000"]}
+            style={styles.bottomGradient}
+          />
 
-            <View style={styles.moveSection}>
-              <Text
-                style={[styles.moveTitle, { fontSize: fontSize.title * 0.7 }]}
+          <SafeAreaView edges={['bottom']} style={styles.footerContainer}>
+            <View style={[
+              styles.footer,
+              { 
+                paddingBottom: insets.bottom > 0 ? 0 : Platform.OS === "ios" ? 30 : 16,
+                paddingHorizontal: HORIZONTAL_PADDING
+              }
+            ]}>
+              <TouchableOpacity
+                style={styles.footerButton}
+                onPress={() => navigation.navigate("Scanning")}
               >
-                Move Pin to
+                <Image
+                  source={scannerIcon}
+                  style={[
+                    styles.footerIcon,
+                    { 
+                      width: scaleFontSize(24), 
+                      height: scaleFontSize(24),
+                      marginBottom: height * 0.005
+                    }
+                  ]}
+                />
+                <Text style={[
+                  styles.footerText,
+                  { fontSize: scaleFontSize(12) }
+                ]}>
+                  Scan
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.footerButton}
+                onPress={() => navigation.navigate("Boards")}
+              >
+                <Image
+                  source={myCollectionIcon}
+                  style={[
+                    styles.footerIcon,
+                    { 
+                      width: scaleFontSize(24), 
+                      height: scaleFontSize(24),
+                      marginBottom: height * 0.005
+                    }
+                  ]}
+                />
+                <Text style={[
+                  styles.footerText,
+                  { fontSize: scaleFontSize(12) }
+                ]}>
+                  My Boards
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </ImageBackground>
+
+        {/* Confirmation Modal */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[
+              styles.modalContainer,
+              { 
+                width: isTablet ? "50%" : "80%",
+                maxWidth: isTablet ? 400 : 300,
+                borderRadius: width * 0.03,
+                padding: width * 0.05
+              }
+            ]}>
+              <Text style={[
+                styles.modalText,
+                { fontSize: scaleFontSize(18) }
+              ]}>
+                Are you sure you want to remove the pin?
               </Text>
-              <View style={styles.moveButtons}>
-                <TouchableOpacity style={styles.moveButton}>
-                  <Image
-                    source={require("../../assets/images/mycollection.png")}
-                    style={styles.moveIcon}
-                  />
-                  <Text
-                    style={[
-                      styles.moveButtonText,
-                      { fontSize: fontSize.button },
-                    ]}
-                  >
-                    My Pin{"\n"}Board
+              <View style={styles.buttonRow}>
+                {/* Cancel Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.cancelButton,
+                    { 
+                      paddingVertical: height * 0.015,
+                      paddingHorizontal: width * 0.05,
+                      borderRadius: width * 0.01
+                    }
+                  ]}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={[
+                    styles.buttonText,
+                    { fontSize: scaleFontSize(16) }
+                  ]}>
+                    Cancel
                   </Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity style={styles.moveButton}>
-                  <Image
-                    source={require("../../assets/images/love.png")}
-                    style={styles.moveIcon}
-                  />
-                  <Text
-                    style={[
-                      styles.moveButtonText,
-                      { fontSize: fontSize.button },
-                    ]}
-                  >
-                    My Wish{"\n"}Board
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.moveButton}>
-                  <Image
-                    source={require("../../assets/images/Trading_Board.png")}
-                    style={styles.moveIcon}
-                  />
-                  <Text
-                    style={[
-                      styles.moveButtonText,
-                      { fontSize: fontSize.button },
-                    ]}
-                  >
-                    My Trading{"\n"}Board
+                {/* Remove Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.removeButton,
+                    { 
+                      paddingVertical: height * 0.015,
+                      paddingHorizontal: width * 0.05,
+                      borderRadius: width * 0.01
+                    }
+                  ]}
+                  onPress={handleRemovePin}
+                >
+                  <Text style={[
+                    styles.removeButtonText,
+                    { fontSize: scaleFontSize(16) }
+                  ]}>
+                    Remove
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-
-        {/* Bottom gradient overlay */}
-        <LinearGradient
-          colors={["rgba(0, 28, 92, 0)", "#000000"]}
-          style={styles.bottomGradient}
-        />
-
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.footerButton}
-            onPress={() => navigation.navigate("Scanning")}
-          >
-            <Image
-              source={require("../../assets/images/scanner.png")}
-              style={styles.footerIcon}
-            />
-            <Text style={styles.footerText}>Scan</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.footerButton}
-            onPress={() => navigation.navigate("Boards")}
-          >
-            <Image
-              source={require("../../assets/images/mycollection.png")}
-              style={styles.footerIcon}
-            />
-            <Text style={styles.footerText}>My Boards</Text>
-          </TouchableOpacity>
-        </View>
-      </ImageBackground>
-
-      {/* Confirmation Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalText}>
-              Are you sure you want to remove the pin?
-            </Text>
-            <View style={styles.buttonRow}>
-              {/* Cancel Button */}
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-              {/* Remove Button */}
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={handleRemovePin}
-              >
-                <Text style={styles.removeButtonText}>Remove</Text>
-              </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal>
-    </View>
+        </Modal>
+      </View>
+    </SafeAreaProvider>
   );
 }
+
+// Detail Row Component
+const DetailRow = ({ label, value, fontSize }) => (
+  <Text style={[styles.detailText, { fontSize }]}>
+    <Text style={styles.detailLabel}>{label}: </Text>
+    {value || "Unknown"}
+  </Text>
+);
+
+// Move Button Component
+const MoveButton = ({ icon, label, fontSize, onPress }) => (
+  <TouchableOpacity 
+    style={styles.moveButton}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <Image source={icon} style={styles.moveIcon} />
+    <Text style={[styles.moveButtonText, { fontSize }]}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
 
 const styles = StyleSheet.create({
   container: {
@@ -328,16 +568,11 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingTop:
-      Platform.OS === "android"
-        ? StatusBar.currentHeight + (StatusBar.currentHeight > 24 ? 40 : 20)
-        : 0,
   },
   header: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
     paddingVertical: 16,
     position: "relative",
     zIndex: 2,
@@ -349,35 +584,28 @@ const styles = StyleSheet.create({
   },
   trashButton: {
     position: "absolute",
-    right: 20,
     top: "50%",
     transform: [{ translateY: -12 }],
   },
   trashIcon: {
-    width: 24,
-    height: 24,
     tintColor: "#fff",
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100, // Space for footer
+    flexGrow: 1,
   },
   card: {
-    padding: 20,
     backgroundColor: "rgba(0, 28, 92, 0.6)",
-    borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.2)",
-    marginBottom: 20,
   },
   imageWrapper: {
     alignItems: "center",
     marginBottom: 16,
   },
   imageContainer: {
-    borderRadius: 20,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.3)",
@@ -395,10 +623,9 @@ const styles = StyleSheet.create({
   pinImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 15,
   },
   detailsContainer: {
-    gap: 8,
+    width: "100%",
   },
   detailText: {
     color: "#fff",
@@ -409,18 +636,16 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.8)",
   },
   moveSection: {
-    marginBottom: 20,
+    width: "100%",
   },
   moveTitle: {
     color: "#fff",
     fontWeight: "bold",
-    marginBottom: 16,
     textAlign: "center",
   },
   moveButtons: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 12,
   },
   moveButton: {
     flex: 1,
@@ -442,30 +667,23 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "500",
   },
+  footerContainer: {
+    zIndex: 2,
+  },
   footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 16,
-    paddingBottom: Platform.OS === "ios" ? 30 : 16,
-    zIndex: 2,
   },
   footerButton: {
     alignItems: "center",
   },
   footerIcon: {
-    width: 24,
-    height: 24,
     tintColor: "#fff",
-    marginBottom: 4,
   },
   footerText: {
     color: "#fff",
-    fontSize: 12,
   },
   modalOverlay: {
     flex: 1,
@@ -474,15 +692,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContainer: {
-    width: "80%",
-    maxWidth: 300,
     backgroundColor: "white",
-    padding: 20,
-    borderRadius: 10,
     alignItems: "center",
   },
   modalText: {
-    fontSize: 18,
     marginBottom: 20,
     textAlign: "center",
     color: "#000000",
@@ -494,25 +707,50 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     backgroundColor: "#fff",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
     marginRight: 10,
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
   removeButton: {
     backgroundColor: "#fff",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: "#3E55C6",
   },
   buttonText: {
     color: "black",
     fontWeight: "bold",
-    fontSize: 16,
   },
   removeButtonText: {
     color: "#3E55C6",
     fontWeight: "bold",
-    fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: "#fff",
+    marginTop: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  errorText: {
+    color: "#fff",
+    textAlign: "center",
+  },
+  retryButton: {
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontWeight: "500",
   },
 });

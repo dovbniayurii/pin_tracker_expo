@@ -17,7 +17,6 @@ import {
 import { Icon } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation } from "@react-navigation/native";
-import CountryPicker from "react-native-country-picker-modal";
 import axios from "axios";
 import axiosPublic from "../../../axiosPublic";
 

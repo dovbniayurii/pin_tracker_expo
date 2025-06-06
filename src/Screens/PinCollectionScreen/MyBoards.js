@@ -5,31 +5,63 @@ import {
   Text,
   Image,
   StyleSheet,
-  SafeAreaView,
-  ScrollView,
   TouchableOpacity,
   ImageBackground,
   Dimensions,
   Platform,
   StatusBar,
+  FlatList,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import axiosClient from "../../../apiClient";
-const loveIcon = require("../../assets/images/love.png");
-const tradingBoardIcon = require("../../assets/images/Trading_Board.png");
 
 // Import images statically
+const loveIcon = require("../../assets/images/love.png");
+const tradingBoardIcon = require("../../assets/images/Trading_Board.png");
 const myCollectionIcon = require("../../assets/images/mycollection.png");
-const { width, height } = Dimensions.get("window");
-const COLUMN_GAP = 12;
-const THUMBNAIL_SIZE = (width - 40 - COLUMN_GAP) / 2; // 40 for padding, 12 for gap
+const scannerIcon = require("../../assets/images/scanner.png");
+const backgroundImage = require("../../assets/images/realsky.png");
 
-export default function MyBoards() {
+const MyBoards = () => {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const [pins, setPin] = useState([]);
+  const [dimensions, setDimensions] = useState({
+    width: Dimensions.get("window").width,
+    height: Dimensions.get("window").height,
+  });
+
+  // Calculate responsive values based on screen dimensions
+  const { width, height } = dimensions;
+  const isTablet = width > 768;
+  const numColumns = isTablet ? 3 : 2;
+  const COLUMN_GAP = width * 0.03; // 3% of screen width
+  const HORIZONTAL_PADDING = width * 0.05; // 5% of screen width
+  const THUMBNAIL_SIZE = (width - (HORIZONTAL_PADDING * 2) - (COLUMN_GAP * (numColumns - 1))) / numColumns;
+  
+  // Responsive font sizing
+  const scaleFontSize = (size) => {
+    const scale = width / 375; // Base scale on iPhone X width
+    return Math.round(size * Math.min(scale, 1.3)); // Cap scaling at 1.3x
+  };
 
   useEffect(() => {
     pinData();
+    
+    // Add dimension change listener for orientation changes
+    const dimensionsHandler = ({ window }) => {
+      setDimensions({
+        width: window.width,
+        height: window.height,
+      });
+    };
+
+    const subscription = Dimensions.addEventListener("change", dimensionsHandler);
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   const pinData = async () => {
@@ -41,127 +73,208 @@ export default function MyBoards() {
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <StatusBar
-        barStyle="light-content"
-        translucent
-        backgroundColor="transparent"
-      />
-      <ImageBackground
-        source={require("../../assets/images/realsky.png")}
-        style={styles.background}
-      >
-        {/* Top gradient overlay */}
-        <LinearGradient
-          colors={["#000000", "rgba(0, 28, 92, 0)"]}
-          style={styles.topGradient}
-        />
-
-        <SafeAreaView style={styles.contentContainer}>
-          <Text style={styles.title}>My Collection</Text>
-
-          {/* Main content area */}
-          <View style={styles.mainContent}>
-            <ScrollView
-              style={styles.scrollView}
-              // iOS scrollbar styling
-              indicatorStyle="white"
-              // Android scrollbar styling
-              scrollIndicatorInsets={{ right: 1 }}
-              showsVerticalScrollIndicator={true}
-              persistentScrollbar={true}
-              // Android specific props
-              {...(Platform.OS === "android" && {
-                scrollbarThumbColor: "rgba(255, 255, 255, 0.6)",
-                scrollbarTrackColor: "rgba(62, 85, 198, 1)",
-                scrollbarFadeDuration: 0,
-                scrollbarSize: 12,
-              })}
-              contentContainerStyle={styles.scrollViewContent}
-            >
-              <View style={styles.sectionHeader}>
-                <Image source={myCollectionIcon} style={styles.sectionIcon} />
-                <Text style={styles.sectionTitle}>My Board</Text>
-              </View>
-
-              <View style={styles.boardsGrid}>
-                {pins.length > 0 ? (
-                  pins.map((pin, index) => (
-                    <TouchableOpacity
-                      key={pin.id || index}
-                      style={styles.boardThumbnail}
-                      onPress={() =>
-                        navigation.navigate("BoardDetails", { itemId: pin.id })
-                      }
-                    >
-                      <Image
-                        source={{
-                          uri: pin.pin.image_url,
-                        }}
-                        style={styles.thumbnailImage}
-                      />
-                    </TouchableOpacity>
-                  ))
-                ) : (
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>No pins added yet</Text>
-                  </View>
-                )}
-              </View>
-            </ScrollView>
-
-            {/* Wish and Trading section */}
-            <View style={styles.wishSection}>
-              <TouchableOpacity style={styles.wishButton}>
-                <Image source={loveIcon} style={styles.buttonIcon} />
-                <Text style={styles.wishText}>My Wish Board</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.tradingButton}>
-                <Image source={tradingBoardIcon} style={styles.buttonIcon} />
-                <Text style={styles.tradingText}>My Trading Board</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </SafeAreaView>
-
-        {/* Bottom gradient overlay */}
-        <LinearGradient
-          colors={["rgba(0, 28, 92, 0)", "#000000"]}
-          style={styles.bottomGradient}
-        />
-
-        {/* Footer navigation */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.footerButton}
-            onPress={() => navigation.navigate("Scanning")}
-          >
-            <Image
-              source={require("../../assets/images/scanner.png")}
-              style={styles.footerIcon}
-            />
-            <Text style={styles.footerText}>Scan</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.footerButton, styles.activeFooterButton]}
-            onPress={() => navigation.navigate("Boards")}
-          >
-            <Image
-              source={require("../../assets/images/mycollection.png")}
-              style={[styles.footerIcon, { tintColor: "#3E55C6" }]}
-            />
-            <Text style={[styles.footerText, styles.activeFooterText]}>
-              My Collection
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ImageBackground>
+  // Empty state component
+  const EmptyState = () => (
+    <View style={styles.emptyState}>
+      <Text style={[styles.emptyText, { fontSize: scaleFontSize(16) }]}>
+        No pins added yet
+      </Text>
     </View>
   );
-}
+
+  // Render grid item
+  const renderBoardItem = ({ item, index }) => (
+    <TouchableOpacity
+      key={item.id || index}
+      style={[
+        styles.boardThumbnail,
+        { 
+          width: THUMBNAIL_SIZE, 
+          height: THUMBNAIL_SIZE,
+          marginRight: index % numColumns !== numColumns - 1 ? COLUMN_GAP : 0
+        }
+      ]}
+      onPress={() => navigation.navigate("BoardDetails", { itemId: item.id })}
+    >
+      <Image
+        source={{ uri: item.pin.image_url }}
+        style={styles.thumbnailImage}
+        resizeMode="cover"
+      />
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaProvider>
+      <View style={styles.container}>
+        <StatusBar
+          barStyle="light-content"
+          translucent
+          backgroundColor="transparent"
+        />
+        <ImageBackground
+          source={backgroundImage}
+          style={styles.background}
+          resizeMode="cover"
+        >
+          {/* Top gradient overlay */}
+          <LinearGradient
+            colors={["#000000", "rgba(0, 28, 92, 0)"]}
+            style={styles.topGradient}
+          />
+
+          <SafeAreaView 
+            edges={['top']} 
+            style={[
+              styles.contentContainer,
+              { paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0 }
+            ]}
+          >
+            <Text style={[
+              styles.title, 
+              { 
+                fontSize: scaleFontSize(24),
+                marginTop: Platform.OS === "android" ? 40 : 20
+              }
+            ]}>
+              My Collection
+            </Text>
+
+            {/* Main content area */}
+            <View style={[
+              styles.mainContent,
+              { paddingHorizontal: HORIZONTAL_PADDING }
+            ]}>
+              <View style={styles.sectionHeader}>
+                <Image source={myCollectionIcon} style={styles.sectionIcon} />
+                <Text style={[styles.sectionTitle, { fontSize: scaleFontSize(16) }]}>
+                  My Board
+                </Text>
+              </View>
+
+              <FlatList
+                data={pins}
+                renderItem={renderBoardItem}
+                keyExtractor={(item, index) => (item.id || index.toString())}
+                numColumns={numColumns}
+                ListEmptyComponent={<EmptyState />}
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={[
+                  styles.gridContainer,
+                  { paddingBottom: height * 0.15 } // Add padding to avoid footer overlap
+                ]}
+                columnWrapperStyle={numColumns > 1 ? { justifyContent: 'flex-start' } : null}
+              />
+
+              {/* Wish and Trading section */}
+              <View style={[
+                styles.wishSection,
+                { 
+                  paddingHorizontal: HORIZONTAL_PADDING * 0.5,
+                  marginBottom: insets.bottom > 0 ? insets.bottom : 20
+                }
+              ]}>
+                <TouchableOpacity 
+                  style={[
+                    styles.wishButton,
+                    { paddingVertical: height * 0.015 }
+                  ]}
+                >
+                  <Image source={loveIcon} style={styles.buttonIcon} />
+                  <Text style={[
+                    styles.wishText,
+                    { fontSize: scaleFontSize(14) }
+                  ]}>
+                    My Wish Board
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[
+                    styles.tradingButton,
+                    { paddingVertical: height * 0.015 }
+                  ]}
+                >
+                  <Image source={tradingBoardIcon} style={styles.buttonIcon} />
+                  <Text style={[
+                    styles.tradingText,
+                    { fontSize: scaleFontSize(14) }
+                  ]}>
+                    My Trading Board
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </SafeAreaView>
+
+          {/* Bottom gradient overlay */}
+          <LinearGradient
+            colors={["rgba(0, 28, 92, 0)", "#000000"]}
+            style={styles.bottomGradient}
+          />
+
+          {/* Footer navigation */}
+          <SafeAreaView edges={['bottom']} style={styles.footerContainer}>
+            <View style={[
+              styles.footer,
+              { 
+                paddingBottom: insets.bottom > 0 ? 0 : Platform.OS === "ios" ? 20 : 15,
+                paddingHorizontal: HORIZONTAL_PADDING
+              }
+            ]}>
+              <TouchableOpacity
+                style={styles.footerButton}
+                onPress={() => navigation.navigate("Scanning")}
+              >
+                <Image
+                  source={scannerIcon}
+                  style={[
+                    styles.footerIcon,
+                    { width: scaleFontSize(24), height: scaleFontSize(24) }
+                  ]}
+                />
+                <Text style={[
+                  styles.footerText,
+                  { fontSize: scaleFontSize(16) }
+                ]}>
+                  Scan
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.footerButton, 
+                  styles.activeFooterButton,
+                  { paddingHorizontal: width * 0.03 }
+                ]}
+                onPress={() => navigation.navigate("Boards")}
+              >
+                <Image
+                  source={myCollectionIcon}
+                  style={[
+                    styles.footerIcon,
+                    { 
+                      tintColor: "#3E55C6",
+                      width: scaleFontSize(24), 
+                      height: scaleFontSize(24)
+                    }
+                  ]}
+                />
+                <Text style={[
+                  styles.footerText, 
+                  styles.activeFooterText,
+                  { fontSize: scaleFontSize(16) }
+                ]}>
+                  My Collection
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </ImageBackground>
+      </View>
+    </SafeAreaProvider>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -191,28 +304,17 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     zIndex: 2,
   },
   title: {
-    fontSize: 24,
     fontWeight: "bold",
     color: "#fff",
     textAlign: "center",
     marginVertical: 20,
-    marginTop: Platform.OS === "android" ? 40 : 20,
   },
   mainContent: {
     flex: 1,
-    paddingHorizontal: 20,
     justifyContent: "space-between",
-  },
-  scrollView: {
-    flex: 1,
-    marginBottom: 10,
-  },
-  scrollViewContent: {
-    paddingRight: Platform.OS === "android" ? 8 : 0,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -225,19 +327,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: "#fff",
-    fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
   },
-  boardsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 20,
+  gridContainer: {
+    flexGrow: 1,
   },
   boardThumbnail: {
-    width: THUMBNAIL_SIZE,
-    height: THUMBNAIL_SIZE,
     borderRadius: 12,
     marginBottom: 12,
     padding: 5,
@@ -262,29 +358,33 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: "#fff",
-    fontSize: 16,
   },
   wishSection: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
-    paddingHorizontal: 10,
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 3,
   },
   wishButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 20,
+    flex: 0.48,
+    justifyContent: "center",
   },
   tradingButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 20,
+    flex: 0.48,
+    justifyContent: "center",
   },
   buttonIcon: {
     width: 20,
@@ -293,22 +393,20 @@ const styles = StyleSheet.create({
   wishText: {
     color: "#fff",
     marginLeft: 8,
-    fontSize: 14,
   },
   tradingText: {
     color: "#fff",
     marginLeft: 8,
-    fontSize: 14,
+  },
+  footerContainer: {
+    zIndex: 2,
   },
   footer: {
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingHorizontal: 20,
     paddingVertical: 15,
-    paddingBottom: Platform.OS === "ios" ? 30 : 15,
     backgroundColor: "transparent",
-    zIndex: 2,
   },
   footerButton: {
     flexDirection: "row",
@@ -319,20 +417,18 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#3E55C6",
     borderRadius: 8,
-    paddingHorizontal: 10,
   },
   footerIcon: {
-    width: 24,
-    height: 24,
     tintColor: "#fff",
     marginRight: 8,
   },
   footerText: {
     color: "white",
-    fontSize: 16,
     fontWeight: "500",
   },
   activeFooterText: {
     color: "#3E55C6",
   },
 });
+
+export default MyBoards;

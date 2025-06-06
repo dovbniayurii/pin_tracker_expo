@@ -14,29 +14,38 @@ import { Icon, Text } from "react-native-paper";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import axios from "axios";
-import CountryPicker from "react-native-country-picker-modal";
 import axiosPublic from "../../../axiosPublic";
+import PhoneInput from "react-native-international-phone-number";
+import parsePhoneNumberFromString from "libphonenumber-js";
 export default function VerifyPhoneNumber() {
   const navigation = useNavigation();
   const route = useRoute();
   const { email } = route.params || {};
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [focusedInput, setFocusedInput] = useState(null);
-  const [countryCode, setCountryCode] = useState("US");
-  const [dialCode, setDialCode] = useState("+1");
-  const [showCountryPicker, setShowCountryPicker] = useState(false);
+  const [phoneValue, setPhoneValue] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState(null);
   const handleSubmit = async () => {
-    if (!phoneNumber) {
+    const phoneNumber = parsePhoneNumberFromString(
+      phoneValue,
+      selectedCountry?.cca2
+    );
+    let formatted;
+    if (phoneNumber?.isValid()) {
+      formatted = phoneNumber.formatInternational().replace(/\s/g, "");
+      // Submit formatted number (+12085689383)
+      console.log(formatted);
+    }
+
+    if (!formatted) {
       Alert.alert("Error", "Please enter your phone number.");
       return;
     }
 
     try {
       const requestBody = {};
-      if (phoneNumber) {
+      if (formatted) {
         // Combine dial code with sanitized phone number
-        const sanitizedPhone = phoneNumber.replace(/[^0-9]/g, "");
-        requestBody.phone_number = `${dialCode}${sanitizedPhone}`;
+        requestBody.phone_number = formatted;
       }
       // Ensure email is included in the request body
       requestBody.email = email;
@@ -101,43 +110,53 @@ export default function VerifyPhoneNumber() {
             {/* Phone Number Input */}
             {/* Phone Number Input */}
             <View style={styles.inputWrapper}>
-              <Text style={styles.label} variant="bodyMedium">
-                Phone Number
-              </Text>
+              <Text style={styles.label}>Phone Number</Text>
               <View
                 style={[
-                  styles.spacedInputContainer,
+                  styles.phoneWrapper,
                   {
-                    borderColor: focusedInput === "phone" ? "#3E55C6" : "gray",
+                    borderColor:
+                      focusedInput === "phone"
+                        ? "#3E55C6"
+                        : "rgba(255, 255, 255, 0.3)",
                   },
                 ]}
               >
-                <CountryPicker
-                  withFilter
-                  withFlag
-                  withCallingCode
-                  withEmoji
-                  countryCode={countryCode}
-                  onSelect={(country) => {
-                    setCountryCode(country.cca2);
-                    setDialCode(`+${country.callingCode[0]}`);
-                  }}
-                  visible={showCountryPicker}
-                  onOpen={() => setShowCountryPicker(true)}
-                  onClose={() => setShowCountryPicker(false)}
-                  containerButtonStyle={styles.countryPickerButton}
-                />
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  placeholder="Enter your phone number"
-                  placeholderTextColor="gray"
-                  keyboardType="phone-pad"
-                  value={phoneNumber}
-                  onChangeText={(text) =>
-                    setPhoneNumber(text.replace(/[^0-9]/g, ""))
-                  }
+                <PhoneInput
+                  value={phoneValue}
+                  onChangePhoneNumber={setPhoneValue}
+                  selectedCountry={selectedCountry}
+                  onChangeSelectedCountry={setSelectedCountry}
+                  containerStyle={styles.phoneContainer}
+                  inputStyle={styles.phoneInput}
+                  flagContainerStyle={styles.flagContainer}
                   onFocus={() => setFocusedInput("phone")}
                   onBlur={() => setFocusedInput(null)}
+                  defaultCountry="US"
+                  phoneInputStyles={{
+                    container: {
+                      backgroundColor: "transparent",
+                    },
+                    input: {
+                      color: "white",
+                      fontSize: 16,
+                      backgroundColor: "transparent",
+                    },
+                    flagContainer: {
+                      //backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                      backgroundColor: "#666666",
+                    },
+                    caret: {
+                      color: "#F3F3F3",
+                      fontSize: 16,
+                    },
+                    countryPickerButton: {
+                      backgroundColor: "transparent",
+                    },
+                    dialCode: {
+                      color: "white",
+                    },
+                  }}
                 />
               </View>
             </View>

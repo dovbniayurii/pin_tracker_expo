@@ -8,8 +8,9 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  TouchableWithoutFeedback,
 } from "react-native";
-import { CameraView, Camera, useCameraPermissions } from "expo-camera";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import axiosClient from "../../../apiClient";
 import * as FileSystem from "expo-file-system";
@@ -18,6 +19,10 @@ const DisneyPinScanner = () => {
   const [facing, setFacing] = useState("back");
   const [permission, requestPermission] = useCameraPermissions();
   const [isLoading, setIsLoading] = useState(false);
+  const [focusPoint, setFocusPoint] = useState({ x: 0.5, y: 0.5 }); // Default center
+  const [cameraDimensions, setCameraDimensions] = useState({ width: 0, height: 0 });
+  const [showFocusIndicator, setShowFocusIndicator] = useState(false);
+  const [focusIndicatorPosition, setFocusIndicatorPosition] = useState({ x: 0, y: 0 });
   const cameraRef = useRef(null);
   const isFocused = useIsFocused();
   const navigation = useNavigation();
@@ -97,17 +102,53 @@ const DisneyPinScanner = () => {
     <View style={styles.container}>
       <SafeAreaView style={styles.contentContainer}>
         {isFocused && (
-          <CameraView 
+          <CameraView
             ref={cameraRef}
             style={styles.cameraContainer}
             facing={facing}
             mode="picture"
             zoom={0}
             enableTorch={false}
-            autofocus="on"
+            autoFocusPointOfInterest={focusPoint} // Set focus point
+            onLayout={(event) => {
+              const { width, height } = event.nativeEvent.layout;
+              setCameraDimensions({ width, height });
+            }}
           >
+            {/* Touch handler for tap-to-focus */}
+            <TouchableWithoutFeedback
+              onPress={(evt) => {
+                if (cameraDimensions.width === 0 || cameraDimensions.height === 0) return;
+                const { locationX, locationY } = evt.nativeEvent;
+                const x = locationX / cameraDimensions.width;
+                const y = locationY / cameraDimensions.height;
+                setFocusPoint({ x, y });
+                setFocusIndicatorPosition({ x: locationX, y: locationY });
+                setShowFocusIndicator(true);
+                setTimeout(() => setShowFocusIndicator(false), 1000);
+              }}
+            >
+              <View style={{ flex: 1 }} />
+            </TouchableWithoutFeedback>
+
+            {/* Focus indicator */}
+            {showFocusIndicator && (
+              <View
+                style={{
+                  position: "absolute",
+                  left: focusIndicatorPosition.x - 25,
+                  top: focusIndicatorPosition.y - 25,
+                  width: 50,
+                  height: 50,
+                  borderRadius: 25,
+                  borderWidth: 2,
+                  borderColor: "white",
+                }}
+              />
+            )}
+
             {/* Scan Overlay */}
-            <View style={styles.overlay}>
+            <View style={[styles.overlay, { pointerEvents: "none" }]}>
               <View style={styles.scanArea}>
                 <View style={[styles.scanCorner, styles.topLeft]} />
                 <View style={[styles.scanCorner, styles.topRight]} />
@@ -162,6 +203,7 @@ const DisneyPinScanner = () => {
   );
 };
 
+// Styles remain unchanged
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -169,10 +211,9 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     flex: 1,
-  
   },
   cameraContainer: {
-    marginTop:100,
+    marginTop: 100,
     height: "60%",
     margin: 20,
     borderRadius: 20,
@@ -265,32 +306,32 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   footer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 40,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingHorizontal: 40,
     zIndex: 2,
   },
   footerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   footerIcon: {
     width: 24,
     height: 24,
-    tintColor: '#fff',
+    tintColor: "#fff",
   },
   footerText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
     marginLeft: 10,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   disabledText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: "rgba(255,255,255,0.5)",
   },
 });
 

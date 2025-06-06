@@ -13,10 +13,9 @@
     },
     "production": {
       "autoIncrement": true
-    }
-    ,
-    "androidapk" : {
-        "android":{
+    },
+    "androidapk": {
+      "android": {
         "buildType": "apk"
       }
     }

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "DistenyPin",
+    "name": "Pin Tracker",
     "slug": "pintracker_app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -14,9 +14,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "yes",
+      "bundleIdentifier": "com.matthewversteeg.pintracker",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {
@@ -24,7 +27,7 @@
         "foregroundImage": "./assets/icon.jpg",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.pintracker_app"
+      "package": "com.anonymous.pintracker"
     },
     "web": {
       "favicon": "./assets/icon.jpg"
